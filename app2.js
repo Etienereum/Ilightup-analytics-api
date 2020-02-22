@@ -38,6 +38,16 @@ app.post('/signup', function(req, res) {
 	firstname = req.body.firstname;
 	email = req.body.email;
 	if (firstname && email) {
+		// Creating a new user
+		connection.query('INSERT INTO MyGuests (firstname, email) VALUES ('?', '?');', [firstname, email], function(error, results, fields) {
+			if (! results) {
+			res.send('could not creat new user');
+			} 
+			else {
+				res.send('successful created new user');
+			}			
+				res.end();
+		});
 			
 		// create a token
 		token = jwt.sign(email, "asterix-needs-permit-a-38");
@@ -45,19 +55,18 @@ app.post('/signup', function(req, res) {
 
 		// saving the token to the cesponsing firstname in the DB
 		connection.query('UPDATE MyGuests SET apikey = ? WHERE email = ?', [token, email], function(error, results, fields) {
-			if (results.length > 0) {
-				req.session.loggedin = true;
-				req.session.username = firstname;
-				resp.redirect('/home');
+			if (! token) {
+				res.send( 'Save your token'= token);
 			} else {
-				resp.send('Incorrect Input');
+				res.send('No Token generated');
 			}			
-			resp.end();
+			res.end();
 		});
-	} else {
-		resp.send('Please enter firstname and email!');
-		resp.end();
-	}
+		}
+		else {
+			res.send('Please enter firstname and email!');
+			res.end();
+		}
 });
 
 
@@ -68,28 +77,12 @@ app.post('/login', function(req, res, next) {
         res.send('Unauthorised person');
 	}
 	else {
-
-
 	}
+    next();
+}, function(req, res) {
+    // Fetch list of sales
 
-
-	
-	
-	if (request.session.loggedin) {
-		response.send('Welcome back, ' + request.session.username + '!');
-	} else {
-		response.send('Please login to view this page!');
-	}
-	response.end();
+    // fetch record and return to the user
 });
-
-// app.get('/record', function(request, response) {
-// 	if (request.session.loggedin) {
-// 		response.send('Welcome back, ' + request.session.username + '!');
-// 	} else {
-// 		response.send('Please login to view this page!');
-// 	}
-// 	response.end();
-// });
 
 app.listen(3000);
