@@ -3,18 +3,21 @@ var express = require('express');
 var session = require('express-session');
 var bodyParser = require('body-parser');
 var jwt = require('jsonwebtoken');
+var bcrypt = require('bcryptjs');
+var config = require('./config.js');
 var path = require('path');
+var unirest = require("unirest");
 
 var connection = mysql.createConnection({
 	host     : 'localhost',
 	user     : 'root',
 	password : '600.Apples',
-	database : 'ilightupdb'
+	database : 'ilightupDB'
 });
   
 connection.connect(function(err) {
   if (err) throw err;
-  console.log("Connected!");
+  console.log("DB is now Connected!");
 });
 
 var app = express();
@@ -32,57 +35,79 @@ app.get('/', function(request, response) {
 	response.sendFile(path.join(__dirname + '/users.html'));
 });
 
-var firstname, email, token;
-
 app.post('/signup', function(req, res) {
-	firstname = req.body.firstname;
-	email = req.body.email;
-	if (firstname && email) {
+	var firstname = req.body.firstname;
+	var password = req.body.password;
+	
+	if (firstname && password) {
+		var passwdHash = bcrypt.hashSync(req.body.password, 8);
+				
 		// Creating a new user
-		connection.query('INSERT INTO MyGuests (firstname, email) VALUES ('?', '?');', [firstname, email], function(error, results, fields) {
-			if (! results) {
-			res.send('could not creat new user');
-			} 
-			else {
-				res.send('successful created new user');
-			}			
-				res.end();
+		connection.query('INSERT INTO MyGuests SET firstname = ?, password =?', [firstname, passwdHash], function(error, results, fields) {
+			if (error) throw error;
 		});
-			
+	
 		// create a token
-		token = jwt.sign(email, "asterix-needs-permit-a-38");
-		res.status(200).send({ auth: true, token: token });
-
+		var token = jwt.sign(firstname, config.secret);
+		
 		// saving the token to the cesponsing firstname in the DB
-		connection.query('UPDATE MyGuests SET apikey = ? WHERE email = ?', [token, email], function(error, results, fields) {
-			if (! token) {
-				res.send( 'Save your token'= token);
-			} else {
+		connection.query('UPDATE MyGuests SET apikey = ? WHERE firstname = ?', [token, firstname], function(error, results, fields) {
+			if ( !token ) {
 				res.send('No Token generated');
+			} else {
+				res.status(200).send( { auth: true, token: token } );
 			}			
-			res.end();
 		});
 		}
 		else {
-			res.send('Please enter firstname and email!');
-			res.end();
+			res.send('Please enter the correct details!');
 		}
 });
 
+// To get a single user data
+app.get('/data', function(req, res, next) {
+	var token = req.headers['x-access-token'];
 
-app.post('/login', function(req, res, next) {
-	token = req.query.key || null;
+	if (!token) return res.status(401).send({ auth: false, message: 'No token provided.' });
+	
+	jwt.verify(token, config.secret, function(err, decoded) {
+	  if (err) return res.status(500).send({ auth: false, message: 'Failed to authenticate token.' });
+	  
+	  res.status(200).send(decoded);
+	});
 
-    if( !token) {
-        res.send('Unauthorised person');
-	}
-	else {
-	}
     next();
-}, function(req, res) {
-    // Fetch list of sales
+},  function (req, res) {
+	
+	// fetch some data for a single user
+	var req = unirest("GET", "https://community-open-weather-map.p.rapidapi.com/weather");
 
-    // fetch record and return to the user
+	req.query({
+		"lon": "0",
+		"callback": "test",
+		"id": "2172797",
+		"units": "%22metric%22 or %22imperial%22",
+		"mode": "xml%2C html",
+		"q": "London%2Cuk"
+	});
+
+	req.headers({
+		"x-rapidapi-host": "community-open-weather-map.p.rapidapi.com",
+		"x-rapidapi-key": "SIGN-UP-FOR-KEY"
+	});
+
+	req.end(function (res) {
+		if (res.error) throw new Error(res.error);
+
+		console.log(res.body);
+	});
 });
 
 app.listen(3000);
+
+
+
+
+	// connection.query('SELECT * FROM NiceBook', function (error, results, fields) {
+	//    if (error) throw error;
+	//  });
